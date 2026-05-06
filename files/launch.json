@@ -1,0 +1,31 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "▶ Run Cloud Function Locally",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "functions_framework",
+      "args": [
+        "--target", "hello_cloud",
+        "--port", "8080",
+        "--debug"
+      ],
+      "cwd": "${workspaceFolder}/src",
+      "env": {
+        "ENVIRONMENT": "development"
+      },
+      "jinja": true,
+      "justMyCode": false
+    },
+    {
+      "name": "🧪 Run Pytest",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": ["tests/", "-v"],
+      "cwd": "${workspaceFolder}",
+      "justMyCode": false
+    }
+  ]
+}

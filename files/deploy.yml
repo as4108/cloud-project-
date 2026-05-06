@@ -1,0 +1,110 @@
+name: Deploy to GCP Cloud Functions
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+env:
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  FUNCTION_NAME: hello-cloud
+  REGION: us-central1
+  RUNTIME: python311
+
+jobs:
+  # ─────────────────────────────────────────────
+  # JOB 1: Test & Lint
+  # ─────────────────────────────────────────────
+  test:
+    name: 🧪 Test & Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Lint with flake8
+        run: flake8 src/ tests/ --max-line-length=100 --ignore=E501,W503
+
+      - name: Check formatting with black
+        run: black --check src/ tests/
+
+      - name: Run tests with coverage
+        run: pytest tests/ -v --cov=src --cov-report=term-missing --cov-fail-under=80
+
+  # ─────────────────────────────────────────────
+  # JOB 2: Deploy (only on push to main)
+  # ─────────────────────────────────────────────
+  deploy:
+    name: 🚀 Deploy to GCP
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    permissions:
+      contents: read
+      id-token: write   # Required for Workload Identity Federation
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+          # Alternative: use Workload Identity Federation (recommended for production)
+          # workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          # service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.PROJECT_ID }}
+
+      - name: Deploy Cloud Function
+        run: |
+          gcloud functions deploy ${{ env.FUNCTION_NAME }} \
+            --gen2 \
+            --region=${{ env.REGION }} \
+            --runtime=${{ env.RUNTIME }} \
+            --source=./src \
+            --entry-point=hello_cloud \
+            --trigger-http \
+            --allow-unauthenticated \
+            --memory=256MB \
+            --timeout=60s \
+            --min-instances=0 \
+            --max-instances=10 \
+            --set-env-vars="ENVIRONMENT=production"
+
+      - name: Get Function URL
+        run: |
+          URL=$(gcloud functions describe ${{ env.FUNCTION_NAME }} \
+            --region=${{ env.REGION }} \
+            --gen2 \
+            --format='value(serviceConfig.uri)')
+          echo "✅ Deployed to: $URL"
+          echo "FUNCTION_URL=$URL" >> $GITHUB_ENV
+
+      - name: Smoke test deployed function
+        run: |
+          echo "Testing deployed endpoint..."
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" "${{ env.FUNCTION_URL }}?name=CI")
+          if [ "$RESPONSE" != "200" ]; then
+            echo "❌ Smoke test failed! HTTP status: $RESPONSE"
+            exit 1
+          fi
+          echo "✅ Smoke test passed! HTTP 200 received."
