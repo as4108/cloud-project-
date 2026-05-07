@@ -1,0 +1,42 @@
+from flask import Flask
+
+app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return '''
+    <html>
+    <head>
+        <title>Cloud Computing Demo</title>
+        <style>
+            body {
+                background: linear-gradient(to right, #74ebd5, #ACB6E5);
+                font-family: Arial;
+                text-align: center;
+                padding-top: 100px;
+                color: white;
+            }
+            .box {
+                background: rgba(255,255,255,0.2);
+                padding: 30px;
+                border-radius: 15px;
+                width: 400px;
+                margin: auto;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="box">
+            <h1>☁ Cloud Computing Website ☁</h1>
+            <p>Welcome to my simple cloud project using Python Flask.</p>
+            <h3>Services:</h3>
+            <p>✔ Cloud Storage</p>
+            <p>✔ Cloud Security</p>
+            <p>✔ Cloud Networking</p>
+        </div>
+    </body>
+    </html>
+    '''
+
+if __name__ == '__main__':
+    app.run(debug=True)
